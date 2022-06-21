@@ -1,8 +1,7 @@
 import pickle, os, datetime
 import pandas as pd
-import numpy as np
 from azure.storage.blob import BlobServiceClient
-from io import BytesIO, StringIO
+from io import StringIO
 from IPython.display import display
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -12,6 +11,7 @@ from azure.keyvault.secrets import SecretClient
 from azure.identity import DefaultAzureCredential, VisualStudioCodeCredential
 import config
 from gmb_functions import get_locations, preprocess_reviews, write_to_blob
+import requests
 
 import logging
 import sys
@@ -44,29 +44,28 @@ luis_apps = {'fr' : '0a5be55e-0c32-482f-abcc-287cb9952f40',
 accounts_list = ['accounts/102280495497198834033', 'accounts/102543083042626102334', 'accounts/116116273817792355878']  # BE + NL + LU
 #account_list = ['accounts/108458503997377848869'] #KE
 
+os.environ["CURL_CA_BUNDLE"] = ""
 
 nb_jours_reprise = 1
 get_accounts = True
 # get_locations = True
 get_reviews = True
 cfh_scope = "cfhb"
-analysis_language =  "en" #"en-us"
 
 ## Param génériques
 ### GMB
-SCOPES = ['https://www.googleapis.com/auth/business.manage']
+# SCOPES = ['https://www.googleapis.com/auth/business.manage']
 discovery_uri = "https://developers.google.com/my-business/samples/mybusiness_google_rest_v4p9.json"
 # discovery_uri = "https://mybusiness.googleapis.com/$discovery/rest?version=v4"
 discovery_uri_info = "https://mybusinessbusinessinformation.googleapis.com/$discovery/rest?version=v1"
 discovery_uri_manag = "https://mybusinessaccountmanagement.googleapis.com/$discovery/rest?version=v1"
 
 gmb_token_file = 'token_cfh.pickle'
-### Process et init varialbes
-__next_step__ = True
+### Process et init variables
 creds = None
 date = datetime.datetime.now()
 date = str(date.day + date.month*100 + date.year*10000)
-date_ref = str(datetime.datetime.now()-datetime.timedelta(days=nb_jours_reprise))[:10]
+date_ref = str(datetime.datetime.now() - datetime.timedelta(days=nb_jours_reprise))[:10]
 ### blob & file systems
 container_param = 'customervoice-param'
 container_stock = 'data'
@@ -100,7 +99,6 @@ connect_param = {'string' : blob_param,
                  'container' : container_param }
 
 blobparam_service_client = BlobServiceClient.from_connection_string(blob_param)
-
 blob_client = blobparam_service_client.get_blob_client(container=container_param,
                                                                   blob=gmb_token_file)        
 creds = pickle.loads(blob_client.download_blob().readall())
@@ -112,10 +110,10 @@ if not creds or not creds.valid:
         creds.refresh(Request())
         print("Credentials Refresh : OK")
 
-accounts_service = build('mybusinessaccountmanagement', 'v1', credentials=creds, discoveryServiceUrl = discovery_uri_manag, static_discovery=False)
+accounts_service = build('mybusinessaccountmanagement', 'v1', credentials=creds)
 df_acc = get_accounts_dataframe(accounts_service)
 
-locations_service = build('mybusinessbusinessinformation', 'v1', credentials=creds, discoveryServiceUrl = discovery_uri_info, static_discovery=False)
+locations_service = build('mybusinessbusinessinformation', 'v1', credentials=creds)
 df_locations = get_locations(locations_service, accounts_list)
 
 blob_client = blobparam_service_client.get_blob_client(container='customervoice-param',
@@ -139,4 +137,6 @@ write_to_blob(blob_stock, container_gmb_ref, "station_enrich.csv", df_stations)
 write_to_blob(blob_stock, container_stock, fl_original, df_reviews)
 
 df_reviews_preprocessed = preprocess_reviews(df_reviews, df_stations)
+
+#### write to blob
 

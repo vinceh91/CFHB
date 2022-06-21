@@ -2,7 +2,7 @@ import datetime
 import pandas as pd
 import googleapiclient
 from azure.storage.blob import BlobServiceClient
-from io import BytesIO
+from io import BytesIO, StringIO
 import numpy as np
 
 def time_printer_ext():
@@ -79,9 +79,9 @@ def get_accounts_dataframe(service: googleapiclient.discovery.Resource) -> pd.Da
     while True:
         if page_token:
             params['pageToken'] = page_token
-            current_page = service.accounts().list(**params).execute()
-            page_token = current_page.get('nextPageToken')
-            all_accounts.extend(current_page['accounts'])
+        current_page = service.accounts().list(**params).execute()
+        page_token = current_page.get('nextPageToken')
+        all_accounts.extend(current_page['accounts'])
         if not page_token:
             break
     df_acc = pd.DataFrame(all_accounts)
@@ -147,5 +147,14 @@ def preprocess_reviews(df: pd.DataFrame, df_stations: pd.DataFrame) -> pd.DataFr
 
     df = df.rename(columns={'reviewId':'id', 'storeCode':'STATIONID', 'comment' : 'text','Location Name':'STORENAME'})
     df = df[['id','USERID','SOURCE','STATIONID','SURVEYDATE','REFUELDATE','RESPONSERECOMMANDATION','text','USERNAME','Country','Country name','REGION','MANAGEMENT MODE','STORENAME']]
+    return df
+
+def read_from_blob(blob_secret: str, container: str, blob: str) -> pd.DataFrame:
+    blobparam_service_client = BlobServiceClient.from_connection_string(blob_secret)
+    blob_client = blobparam_service_client.get_blob_client(container=container,
+                                                  blob=blob)
+    my_string = str(blob_client.download_blob().readall(),'latin-1')
+    data = StringIO(my_string) 
+    df = pd.read_csv(data, sep=";")
     return df
 
