@@ -1,4 +1,4 @@
-import pickle, os, datetime
+import pickle, datetime
 import pandas as pd
 from azure.storage.blob import BlobServiceClient
 from io import StringIO
@@ -9,8 +9,8 @@ from google.auth.transport.requests import Request
 import googleapiclient
 from azure.keyvault.secrets import SecretClient
 from azure.identity import DefaultAzureCredential, VisualStudioCodeCredential
-import config
-from gmb_functions import get_locations, preprocess_reviews, write_to_blob
+from config import *
+from gmb_functions import get_locations, preprocess_reviews, write_to_blob, get_accounts_dataframe, get_reviews
 import requests
 
 import logging
@@ -18,8 +18,6 @@ import sys
 
 # ...
 import os
-
-from gmb_functions import get_accounts_dataframe
 # os.environ["HTTP_PROXY"] = "http://10.10.1.10:1180"
 
 # Alternate URL and variable forms:
@@ -35,16 +33,9 @@ from gmb_functions import get_accounts_dataframe
 # handler = logging.StreamHandler(stream=sys.stdout)
 # logger.addHandler(handler)
 
-### LUIS
-luis_apps = {'fr' : '0a5be55e-0c32-482f-abcc-287cb9952f40',
-             'en' : '11fe55ad-3644-475e-a838-a49ed6a94ded',
-             'nl' : 'f176f20b-a4fa-470c-af05-ea4e72343412' }
-
 ## Param spécifiques
 accounts_list = ['accounts/102280495497198834033', 'accounts/102543083042626102334', 'accounts/116116273817792355878']  # BE + NL + LU
 #account_list = ['accounts/108458503997377848869'] #KE
-
-os.environ["CURL_CA_BUNDLE"] = ""
 
 nb_jours_reprise = 1
 get_accounts = True
@@ -66,10 +57,6 @@ creds = None
 date = datetime.datetime.now()
 date = str(date.day + date.month*100 + date.year*10000)
 date_ref = str(datetime.datetime.now() - datetime.timedelta(days=nb_jours_reprise))[:10]
-### blob & file systems
-container_param = 'customervoice-param'
-container_stock = 'data'
-container_gmb_ref = 'gmb-data-ref'
 fl_fbacks = "feedbacks/fbacks_"+ date +".csv"
 fl_original = "original/data_"+ date +".csv"
 fl_luis = "luis/luis_"+ date +".csv"
@@ -79,8 +66,7 @@ fl_phrases = "keyphrases/phrases_"+date+".csv"
 #Getting secrets
 
 #Storage accounts
-blob_param = config.BLOB_PARAM_STRING
-blob_stock = config.BLOB_STOCK_KEY
+
 # keyVaultName = "azkvpcfhb02" 
 # KVUri = f"https://{keyVaultName}.vault.azure.net"
 # credential = DefaultAzureCredential(ogging_enable=True)
@@ -89,17 +75,9 @@ blob_stock = config.BLOB_STOCK_KEY
 # secretName = "blob-param-string"
 # retrieved_secret = client.get_secret(secretName).value
 
-# #Services cognitifs
-key_text_translation = config.TT_KEY
-key_text_analysis = config.TA_KEY
-key_luis = config.LU_KEY
 
-# # mise en forme
-connect_param = {'string' : blob_param,
-                 'container' : container_param }
-
-blobparam_service_client = BlobServiceClient.from_connection_string(blob_param)
-blob_client = blobparam_service_client.get_blob_client(container=container_param,
+blobparam_service_client = BlobServiceClient.from_connection_string(BLOB_PARAM_STRING)
+blob_client = blobparam_service_client.get_blob_client(container=CONTAINER_PARAM,
                                                                   blob=gmb_token_file)        
 creds = pickle.loads(blob_client.download_blob().readall())
 if not creds or not creds.valid:
@@ -131,10 +109,10 @@ reviews_service = build('mybusiness', 'v4', credentials=creds, discoveryServiceU
 df_reviews = get_reviews(reviews_service, df_locations, date_ref)
 
 #### Write to blob
-write_to_blob(blob_stock, container_gmb_ref, "location_accounts.csv", df_acc)
-write_to_blob(blob_stock, container_gmb_ref, "station_raw.csv", df_locations)
-write_to_blob(blob_stock, container_gmb_ref, "station_enrich.csv", df_stations)
-write_to_blob(blob_stock, container_stock, fl_original, df_reviews)
+write_to_blob(BLOB_STOCK_KEY, CONTAINER_GMB_REF, "location_accounts.csv", df_acc)
+write_to_blob(BLOB_STOCK_KEY, CONTAINER_GMB_REF, "station_raw.csv", df_locations)
+write_to_blob(BLOB_STOCK_KEY, CONTAINER_GMB_REF, "station_enrich.csv", df_stations)
+write_to_blob(BLOB_STOCK_KEY, CONTAINER_STOCK, fl_original, df_reviews)
 
 df_reviews_preprocessed = preprocess_reviews(df_reviews, df_stations)
 
