@@ -97,10 +97,10 @@ def get_accounts_dataframe(service: googleapiclient.discovery.Resource) -> pd.Da
 
 
 def get_locations(
-    service: googleapiclient.discovery.Resource, accounts_list: list
+    service: googleapiclient.discovery.Resource, accounts_list: dict
 ) -> pd.DataFrame:
     df_loc = pd.DataFrame()
-    for acc in accounts_list:
+    for _, acc in accounts_list:
         params = {"parent": acc, "readMask": "storeCode,name"}
         page_token = None
         while True:
