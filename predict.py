@@ -1,9 +1,10 @@
-from gmb_functions import preprocess_reviews, read_from_blob, delete_lines_return
+from gmb_functions import preprocess_reviews, read_from_blob, delete_lines_return, write_to_blob
 from azure.storage.blob import BlobServiceClient
 import pandas as pd
 import datetime
 from ai_functions import the_voice_multi_lines
 from config import *
+from pandas.io.json import json_normalize
 
 date = datetime.datetime.now()
 date = str(date.day + date.month * 100 + date.year * 10000)
@@ -46,3 +47,15 @@ df_feedbacks = the_voice_multi_lines(
 df_feedbacks["id_unique"] = df_feedbacks["id"]
 df_feedbacks["suggested"] = df_feedbacks["suggested"].fillna("")
 df_feedbacks["suggested"] = df_feedbacks["suggested"].apply(delete_lines_return)
+
+#code changé donc à checker attention
+key_phrases_df = df_feedbacks[~df_feedbacks["key_phrases"].isin(["nan", "NaN",""," "])]["key_phrases"]
+key_phrases_df = key_phrases_df.reset_index(drop=True)
+
+luis_df = df_feedbacks[~df_feedbacks["luis"].isin(["nan", "NaN",""," "])]["luis"]
+luis_df = json_normalize(luis_df)
+luis_df = luis_df.reset_index(drop=True)
+
+write_to_blob(BLOB_STOCK_KEY, CONTAINER_STOCK, fl_fbacks, df_feedbacks)
+write_to_blob(BLOB_STOCK_KEY, CONTAINER_STOCK, fl_luis, luis_df)
+write_to_blob(BLOB_STOCK_KEY, CONTAINER_STOCK, fl_phrases, key_phrases_df)
